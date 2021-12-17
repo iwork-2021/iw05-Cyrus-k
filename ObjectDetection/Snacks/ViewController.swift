@@ -34,6 +34,7 @@ import Vision
 class ViewController: UIViewController {
 
   @IBOutlet var videoPreview: UIView!
+    
 
   var videoCapture: VideoCapture!
   var currentBuffer: CVPixelBuffer?
@@ -74,6 +75,8 @@ class ViewController: UIViewController {
   let maxBoundingBoxViews = 10
   var boundingBoxViews = [BoundingBoxView]()
   var colors: [String: UIColor] = [:]
+  var greenView = [UIView]()
+  var viewNum:Int = 0
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -82,8 +85,9 @@ class ViewController: UIViewController {
   }
 
   func setUpBoundingBoxViews() {
-    for _ in 0..<maxBoundingBoxViews {
+      for _ in 0..<maxBoundingBoxViews {
       boundingBoxViews.append(BoundingBoxView())
+        greenView.append(UIView())
     }
 
     let labels = [
@@ -141,9 +145,9 @@ class ViewController: UIViewController {
 
         // Add the bounding box layers to the UI, on top of the video preview.
         for box in self.boundingBoxViews {
-          box.addToLayer(self.videoPreview.layer)
+            box.addToLayer(self.videoPreview.layer)
         }
-
+        //print("good")
         // Once everything is set up, we can start capturing live video.
         self.videoCapture.start()
       }
@@ -181,10 +185,83 @@ class ViewController: UIViewController {
 
   func processObservations(for request: VNRequest, error: Error?) {
     //call show function
+      if let results = request.results as? [VNRecognizedObjectObservation]{
+          if results.isEmpty{
+              print("nothing found")
+              DispatchQueue.main.async {
+                  for i in 0...self.viewNum{
+                      if(i<10){
+                      self.greenView[i].removeFromSuperview()
+                      }
+                  }
+              }
+          }
+          else{
+              /*let tempindex = results.count
+              let result_confidence = results[0].confidence
+              let result_label = results[0].labels*/
+              self.show(predictions: results)
+          }
+      }
+      else if let error = error {
+          print("Error found : \(error.localizedDescription)")
+      }
+      else{
+          print("i don't know what happened")
+      }
   }
 
   func show(predictions: [VNRecognizedObjectObservation]) {
    //process the results, call show function in BoundingBoxView
+      print(predictions.count)
+      for i in 1...predictions.count{
+          let result_confidence = predictions[i - 1].confidence
+          let result_boundingbox = predictions[i - 1].boundingBox
+          print(predictions[i - 1].boundingBox)
+          print(result_confidence)
+          let result_label = predictions[i - 1].labels[0].identifier
+          print(result_label)
+          DispatchQueue.main.async {
+              
+            if(i<=10){
+                  self.greenView[i-1].removeFromSuperview()
+            }
+          }
+          
+          if(result_confidence > 0.8){
+          DispatchQueue.main.async {
+              let screenSize: CGRect = UIScreen.main.bounds
+              let screenWidth = screenSize.width
+              print(screenWidth)
+              let screenHeight = screenSize.height
+              //let xPos = 100
+              //let yPos = 300
+              //let rectWidth = Int(screenWidth) - 2 * xPos
+              //let rectHeight = Int(screenHeight) - 2 * yPos
+              print(result_boundingbox.minX)
+              print("good")
+              let rectFrame: CGRect = CGRect(x:CGFloat(result_boundingbox.minX*screenWidth), y:CGFloat(result_boundingbox.minY*screenHeight), width:CGFloat((result_boundingbox.width)*screenWidth), height:CGFloat(result_boundingbox.height)*screenHeight)
+              self.greenView[i-1] = UIView(frame: rectFrame)
+              self.greenView[i-1].backgroundColor = UIColor.clear
+              
+              self.greenView[i-1].layer.borderWidth = 3.0
+              self.greenView[i-1].layer.borderColor = self.colors[result_label]!.cgColor
+              let label = UILabel(frame: CGRect(x:CGFloat(0), y:CGFloat(-20), width:CGFloat(200), height:CGFloat(20)))
+              label.textColor = self.colors[result_label]
+              let tempstring = String(format: "%.1f%%", result_confidence * 100)
+              label.text = result_label + tempstring
+              self.greenView[i-1].addSubview(label)
+              self.view.addSubview(self.greenView[i-1])
+              self.viewNum = self.viewNum + 1
+              //self.view.addSubview(self.boundingBoxViews[i-1])
+              
+          }
+          }
+          
+          if i == maxBoundingBoxViews {break}
+          print("i = ",i)
+      }
+  }
 }
 
 extension ViewController: VideoCaptureDelegate {
@@ -192,3 +269,4 @@ extension ViewController: VideoCaptureDelegate {
     predict(sampleBuffer: sampleBuffer)
   }
 }
+
